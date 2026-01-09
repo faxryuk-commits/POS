@@ -168,3 +168,22 @@ export function useOfflineIndicator() {
         : null,
   }
 }
+
+/**
+ * Main useOffline hook - combines online status and sync status
+ * This is the primary hook for components that need offline functionality
+ */
+export function useOffline() {
+  const { isOnline, lastOnline } = useOnlineStatus()
+  const { pending, isSyncing, sync, queueTransaction, hasPendingSync } = useSync()
+
+  return {
+    isOnline,
+    lastOnline,
+    offlineQueueCount: pending,
+    isSyncing,
+    hasPendingSync,
+    sync,
+    queueTransaction,
+  }
+}
