@@ -18,7 +18,7 @@ const categoryIcons = {
   'Алкоголь': '🍺',
 }
 
-export default function ProductsScreen() {
+export default function ProductsScreen({ pendingBarcode, onBarcodeUsed }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -49,6 +49,25 @@ export default function ProductsScreen() {
       loadProductImages()
     }
   }, [products])
+  
+  // Обработка штрих-кода из сканера
+  useEffect(() => {
+    if (pendingBarcode) {
+      // Открываем модальное окно с предзаполненным штрих-кодом
+      setEditingProduct(null)
+      setFormData({
+        name: '',
+        price: '',
+        stock: '',
+        category: 'Напитки',
+        barcode: pendingBarcode,
+        image: null
+      })
+      setShowModal(true)
+      // Очищаем pendingBarcode после использования
+      onBarcodeUsed?.()
+    }
+  }, [pendingBarcode, onBarcodeUsed])
   const currencySymbol = getCurrencySymbol()
   const formatPrice = (price) => `${price.toLocaleString()} ${currencySymbol}`
   const confirm = useConfirm()

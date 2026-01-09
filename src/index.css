@@ -735,6 +735,21 @@ input[type="number"] {
   overscroll-behavior-x: contain;
 }
 
+/* Stable vertical scroll (no rubber-banding) */
+.scroll-stable {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  scroll-behavior: auto;
+}
+
+/* Prevent parent scroll when nested container is scrollable */
+.scroll-isolated {
+  overscroll-behavior: contain;
+  isolation: isolate;
+}
+
 /* Fix for content clipping */
 .overflow-clip-visible {
   overflow: visible;

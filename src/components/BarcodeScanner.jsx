@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore'
 import { X, Camera, Flashlight, FlashlightOff, AlertCircle, Check, ScanLine, Keyboard, RotateCcw } from 'lucide-react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
-export default function BarcodeScanner({ onClose, onScan }) {
+export default function BarcodeScanner({ onClose, onScan, onCreateProduct }) {
   const scannerRef = useRef(null)
   const html5QrCodeRef = useRef(null)
   const [isScanning, setIsScanning] = useState(false)
@@ -15,6 +15,7 @@ export default function BarcodeScanner({ onClose, onScan }) {
   const [cameraError, setCameraError] = useState(null)
   const [cameras, setCameras] = useState([])
   const [selectedCamera, setSelectedCamera] = useState(null)
+  const [notFoundCode, setNotFoundCode] = useState(null) // Код для создания товара
   const processedCodes = useRef(new Set())
 
   const { findProductByBarcode, addToCart } = useStore()
@@ -45,22 +46,36 @@ export default function BarcodeScanner({ onClose, onScan }) {
     if (product) {
       addToCart(product)
       setLastScanned({ success: true, product, code })
+      setNotFoundCode(null) // Сброс
       onScan?.(product)
       
       // Вибрация при успехе
       if (navigator.vibrate) {
         navigator.vibrate([50, 100])
       }
+      
+      setTimeout(() => setLastScanned(null), 3000)
     } else {
       setLastScanned({ success: false, code })
+      setNotFoundCode(code) // Сохраняем для создания товара
       if (navigator.vibrate) {
         navigator.vibrate([30, 30, 30, 30])
       }
+      
+      // Не скрываем уведомление, чтобы пользователь мог создать товар
+      setTimeout(() => setLastScanned(null), 5000)
     }
     
     setManualCode('')
-    setTimeout(() => setLastScanned(null), 3000)
   }, [findProductByBarcode, addToCart, onScan])
+  
+  // Создать товар по штрих-коду
+  const handleCreateProduct = useCallback(() => {
+    if (notFoundCode && onCreateProduct) {
+      onCreateProduct(notFoundCode)
+      onClose()
+    }
+  }, [notFoundCode, onCreateProduct, onClose])
 
   // Инициализация списка камер
   useEffect(() => {
@@ -298,7 +313,7 @@ export default function BarcodeScanner({ onClose, onScan }) {
             absolute top-4 left-4 right-4 p-4 rounded-2xl shadow-2xl
             ${lastScanned.success
               ? 'bg-ios-green text-white'
-              : 'bg-ios-red text-white'
+              : 'bg-ios-orange text-white'
             }
             animate-ios-slide-up
           `}>
@@ -318,12 +333,41 @@ export default function BarcodeScanner({ onClose, onScan }) {
                   <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                     <AlertCircle size={24} />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold text-lg">Товар не найден</div>
-                    <div className="text-sm opacity-80 font-mono">{lastScanned.code}</div>
+                    <div className="text-sm opacity-80 font-mono truncate">{lastScanned.code}</div>
                   </div>
+                  {onCreateProduct && (
+                    <button
+                      onClick={handleCreateProduct}
+                      className="flex-shrink-0 px-4 py-2 bg-white text-ios-orange rounded-xl font-semibold hover:bg-white/90 transition-colors"
+                    >
+                      Создать
+                    </button>
+                  )}
                 </>
               )}
+            </div>
+          </div>
+        )}
+        
+        {/* Постоянная панель для создания товара */}
+        {notFoundCode && !lastScanned && onCreateProduct && (
+          <div className="absolute bottom-28 left-4 right-4 p-4 rounded-2xl shadow-2xl bg-surface-800 border border-surface-700 animate-ios-slide-up">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-ios-blue/20 rounded-full flex items-center justify-center">
+                <ScanLine size={20} className="text-ios-blue" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-medium">Последний код:</div>
+                <div className="text-sm text-white/60 font-mono truncate">{notFoundCode}</div>
+              </div>
+              <button
+                onClick={handleCreateProduct}
+                className="flex-shrink-0 px-4 py-2 bg-ios-blue text-white rounded-xl font-semibold hover:bg-ios-blue/80 transition-colors"
+              >
+                + Создать товар
+              </button>
             </div>
           </div>
         )}

@@ -23,6 +23,7 @@ import { Maximize2, Minimize2 } from 'lucide-react'
 function App() {
   const { 
     activePage, 
+    setActivePage,
     isAuthenticated, 
     showPinModal,
     currentCashier,
@@ -41,6 +42,9 @@ function App() {
   
   // Состояние для обновления времени
   const [currentTime, setCurrentTime] = useState(new Date())
+  
+  // Штрих-код для создания нового товара
+  const [pendingBarcode, setPendingBarcode] = useState(null)
 
   // Проверяем нужно ли показывать онбординг
   useEffect(() => {
@@ -70,7 +74,7 @@ function App() {
       case 'pos':
         return <POSScreen />
       case 'products':
-        return <ProductsScreen />
+        return <ProductsScreen pendingBarcode={pendingBarcode} onBarcodeUsed={() => setPendingBarcode(null)} />
       case 'catalog':
         return <CatalogScreen />
       case 'discounts':
@@ -179,6 +183,12 @@ function App() {
                 onClose={() => setScannerOpen(false)}
                 onScan={() => {
                   // Товар уже добавлен в корзину внутри сканера
+                }}
+                onCreateProduct={(barcode) => {
+                  // Переходим на страницу товаров с предзаполненным штрих-кодом
+                  setPendingBarcode(barcode)
+                  setActivePage('products')
+                  setScannerOpen(false)
                 }}
               />
             )}

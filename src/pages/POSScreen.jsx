@@ -193,7 +193,11 @@ export default function POSScreen() {
       </div>
 
       {/* Cart Items - Scrollable */}
-      <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 ${isMobile ? 'max-h-[40vh]' : ''}`}>
+      <div 
+        data-scrollable
+        className={`flex-1 min-h-0 overflow-y-auto scroll-stable px-4 py-3 ${isMobile ? 'max-h-[40vh]' : ''}`}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
         {cart.length === 0 ? (
           <div className="h-full min-h-[200px] flex flex-col items-center justify-center">
             <div className="w-20 h-20 bg-fill-tertiary rounded-full flex items-center justify-center mb-4">
@@ -422,12 +426,22 @@ export default function POSScreen() {
 
       {/* Mobile Cart Sheet */}
       {showMobileCart && (
-        <div className="md:hidden fixed inset-0 z-50">
+        <div 
+          className="md:hidden fixed inset-0 z-50"
+          onTouchMove={(e) => {
+            // Предотвращаем прокрутку фона
+            const target = e.target
+            const scrollableParent = target.closest('[data-scrollable]')
+            if (!scrollableParent) {
+              e.preventDefault()
+            }
+          }}
+        >
           <div 
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setShowMobileCart(false)}
           />
-          <div className="absolute bottom-0 left-0 right-0 bg-themed-secondary rounded-t-[20px] max-h-[85vh] overflow-hidden flex flex-col animate-ios-slide-up">
+          <div className="absolute bottom-0 left-0 right-0 bg-themed-secondary rounded-t-[20px] max-h-[85vh] overflow-hidden flex flex-col animate-ios-slide-up scroll-isolated">
             <div className="ios-sheet-handle" />
             <CartContent isMobile />
           </div>
