@@ -6,6 +6,8 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 export default function BarcodeScanner({ onClose, onScan, onCreateProduct }) {
   const scannerRef = useRef(null)
   const html5QrCodeRef = useRef(null)
+  const isTransitioning = useRef(false) // Флаг перехода между состояниями
+  const isMounted = useRef(true) // Флаг монтирования компонента
   const [isScanning, setIsScanning] = useState(false)
   const [hasCamera, setHasCamera] = useState(true)
   const [torch, setTorch] = useState(false)
@@ -19,6 +21,27 @@ export default function BarcodeScanner({ onClose, onScan, onCreateProduct }) {
   const processedCodes = useRef(new Set())
 
   const { findProductByBarcode, addToCart } = useStore()
+  
+  // Безопасная остановка сканера
+  const stopScanner = useCallback(async () => {
+    if (!html5QrCodeRef.current) return
+    
+    // Проверяем состояние сканера
+    try {
+      const state = html5QrCodeRef.current.getState()
+      // Состояния: NOT_STARTED = 1, SCANNING = 2, PAUSED = 3
+      if (state === 2 || state === 3) { // SCANNING или PAUSED
+        if (!isTransitioning.current) {
+          isTransitioning.current = true
+          await html5QrCodeRef.current.stop()
+          isTransitioning.current = false
+        }
+      }
+    } catch (err) {
+      // Игнорируем ошибки - сканер может быть уже остановлен
+      isTransitioning.current = false
+    }
+  }, [])
 
   // Поддерживаемые форматы штрих-кодов
   const supportedFormats = [
@@ -105,23 +128,31 @@ export default function BarcodeScanner({ onClose, onScan, onCreateProduct }) {
   // Запуск сканера при выборе камеры
   useEffect(() => {
     if (!selectedCamera || !scannerRef.current) return
+    
+    let cancelled = false
 
     const startScanner = async () => {
+      // Ждём если идёт переход
+      if (isTransitioning.current) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
+      
+      if (cancelled || !isMounted.current) return
+
       try {
         // Остановить предыдущий сканер если есть
-        if (html5QrCodeRef.current) {
-          try {
-            await html5QrCodeRef.current.stop()
-          } catch (e) {
-            // Игнорируем ошибки остановки
-          }
-        }
+        await stopScanner()
+        
+        if (cancelled || !isMounted.current) return
 
+        // Создаём новый экземпляр сканера
         html5QrCodeRef.current = new Html5Qrcode('barcode-scanner-region', {
           formatsToSupport: supportedFormats,
           verbose: false
         })
 
+        isTransitioning.current = true
+        
         await html5QrCodeRef.current.start(
           selectedCamera,
           {
@@ -130,56 +161,68 @@ export default function BarcodeScanner({ onClose, onScan, onCreateProduct }) {
             aspectRatio: 16 / 9,
           },
           (decodedText) => {
-            processBarcode(decodedText)
+            if (isMounted.current) {
+              processBarcode(decodedText)
+            }
           },
           () => {
             // Ошибки сканирования игнорируем (это нормально когда нет штрих-кода в кадре)
           }
         )
 
-        setIsScanning(true)
-        setCameraError(null)
+        isTransitioning.current = false
+        
+        if (isMounted.current) {
+          setIsScanning(true)
+          setCameraError(null)
+        }
       } catch (err) {
+        isTransitioning.current = false
         console.error('Scanner start error:', err)
-        setCameraError(err.message || 'Ошибка запуска сканера')
-        setIsScanning(false)
+        if (isMounted.current) {
+          setCameraError(err.message || 'Ошибка запуска сканера')
+          setIsScanning(false)
+        }
       }
     }
 
     startScanner()
 
     return () => {
-      if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop().catch(() => {})
-      }
+      cancelled = true
+      stopScanner()
     }
-  }, [selectedCamera, processBarcode])
+  }, [selectedCamera, processBarcode, stopScanner])
 
-  // Очистка при закрытии
+  // Очистка при размонтировании
   useEffect(() => {
+    isMounted.current = true
+    
     return () => {
-      if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop().catch(() => {})
-      }
+      isMounted.current = false
+      stopScanner()
     }
-  }, [])
+  }, [stopScanner])
 
   const toggleTorch = async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        const track = html5QrCodeRef.current.getRunningTrackCameraCapabilities()
-        if (track?.torchFeature?.isSupported()) {
-          await track.torchFeature.apply(!torch)
-          setTorch(!torch)
-        }
-      } catch (err) {
-        console.error('Torch error:', err)
+    if (!html5QrCodeRef.current || isTransitioning.current) return
+    
+    try {
+      const state = html5QrCodeRef.current.getState()
+      if (state !== 2) return // Только если SCANNING
+      
+      const track = html5QrCodeRef.current.getRunningTrackCameraCapabilities()
+      if (track?.torchFeature?.isSupported()) {
+        await track.torchFeature.apply(!torch)
+        setTorch(!torch)
       }
+    } catch (err) {
+      console.error('Torch error:', err)
     }
   }
 
-  const switchCamera = () => {
-    if (cameras.length > 1) {
+  const switchCamera = async () => {
+    if (cameras.length > 1 && !isTransitioning.current) {
       const currentIndex = cameras.findIndex(c => c.id === selectedCamera)
       const nextIndex = (currentIndex + 1) % cameras.length
       setSelectedCamera(cameras[nextIndex].id)
