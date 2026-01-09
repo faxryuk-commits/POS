@@ -219,6 +219,12 @@ export const useStore = create(
       // Движения склада
       stockMovements: [],
       
+      // Точки продаж / магазины
+      stores: [
+        { id: 1, name: 'Главный магазин', address: '', phone: '', isActive: true, isDefault: true }
+      ],
+      currentStore: 1,
+      
       // Активная страница
       activePage: 'pos',
       
@@ -283,6 +289,70 @@ export const useStore = create(
       deleteCashier: (id) => set((state) => ({
         cashiers: state.cashiers.filter(c => c.id !== id)
       })),
+
+      // ============ УПРАВЛЕНИЕ ТОЧКАМИ/МАГАЗИНАМИ ============
+
+      /**
+       * Добавить новую точку
+       */
+      addStore: (store) => set((state) => ({
+        stores: [...state.stores, { 
+          ...store, 
+          id: Date.now(),
+          isActive: true,
+          isDefault: state.stores.length === 0
+        }]
+      })),
+
+      /**
+       * Обновить точку
+       */
+      updateStore: (id, updates) => set((state) => ({
+        stores: state.stores.map(s => s.id === id ? { ...s, ...updates } : s)
+      })),
+
+      /**
+       * Удалить точку
+       */
+      deleteStore: (id) => set((state) => {
+        const filtered = state.stores.filter(s => s.id !== id)
+        // Если удалили текущую точку - переключиться на первую доступную
+        let newCurrentStore = state.currentStore
+        if (state.currentStore === id && filtered.length > 0) {
+          newCurrentStore = filtered[0].id
+        }
+        // Если удалили default - сделать первую default
+        if (filtered.length > 0 && !filtered.some(s => s.isDefault)) {
+          filtered[0].isDefault = true
+        }
+        return { 
+          stores: filtered,
+          currentStore: newCurrentStore
+        }
+      }),
+
+      /**
+       * Выбрать активную точку
+       */
+      setCurrentStore: (storeId) => set({ currentStore: storeId }),
+
+      /**
+       * Установить точку по умолчанию
+       */
+      setDefaultStore: (storeId) => set((state) => ({
+        stores: state.stores.map(s => ({
+          ...s,
+          isDefault: s.id === storeId
+        }))
+      })),
+
+      /**
+       * Получить текущую точку
+       */
+      getCurrentStore: () => {
+        const { stores, currentStore } = get()
+        return stores.find(s => s.id === currentStore) || stores[0]
+      },
 
       // Методы для товаров
       addProduct: (product) => set((state) => ({

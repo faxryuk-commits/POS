@@ -3,16 +3,20 @@ import { useStore } from '../store/useStore'
 import { 
   Settings, Store, CreditCard, Users, LogOut, Save, 
   ChevronRight, Globe, Printer, Database, Shield,
-  Plus, Edit2, Trash2, X, Check, GraduationCap, Sun, Moon, Monitor
+  Plus, Edit2, Trash2, X, Check, GraduationCap, Sun, Moon, Monitor,
+  MapPin, Phone, Star
 } from 'lucide-react'
 import { ThemeToggle } from '../components/ThemeProvider'
-import { useConfirm } from '../components/ConfirmDialog'
+import { useConfirm, useStatusToast } from '../components/ConfirmDialog'
 
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState('general')
   const [showCashierModal, setShowCashierModal] = useState(false)
   const [editingCashier, setEditingCashier] = useState(null)
   const [cashierForm, setCashierForm] = useState({ name: '', pin: '', role: 'cashier' })
+  const [showStoreModal, setShowStoreModal] = useState(false)
+  const [editingStore, setEditingStore] = useState(null)
+  const [storeForm, setStoreForm] = useState({ name: '', address: '', phone: '' })
 
   const {
     settings,
@@ -25,9 +29,18 @@ export default function SettingsScreen() {
     deleteCashier,
     logout,
     resetToDemo,
-    setShowOnboarding
+    setShowOnboarding,
+    // Stores
+    stores,
+    currentStore,
+    addStore,
+    updateStore,
+    deleteStore,
+    setCurrentStore,
+    setDefaultStore
   } = useStore()
   const confirm = useConfirm()
+  const { success } = useStatusToast()
 
   const handleSettingChange = (key, value) => {
     updateSettings({ [key]: value })
@@ -66,8 +79,52 @@ export default function SettingsScreen() {
     }
   }
 
+  // Store modal handlers
+  const openStoreModal = (store = null) => {
+    if (store) {
+      setEditingStore(store)
+      setStoreForm({ name: store.name, address: store.address || '', phone: store.phone || '' })
+    } else {
+      setEditingStore(null)
+      setStoreForm({ name: '', address: '', phone: '' })
+    }
+    setShowStoreModal(true)
+  }
+
+  const handleStoreSubmit = (e) => {
+    e.preventDefault()
+    if (!storeForm.name.trim()) return
+
+    if (editingStore) {
+      updateStore(editingStore.id, storeForm)
+      success('Точка обновлена')
+    } else {
+      addStore(storeForm)
+      success('Точка добавлена')
+    }
+    setShowStoreModal(false)
+  }
+
+  const handleDeleteStore = async (store) => {
+    if (stores.length <= 1) {
+      alert('Нельзя удалить единственную точку')
+      return
+    }
+    const confirmed = await confirm({
+      title: 'Удалить точку?',
+      message: `Точка "${store.name}" будет удалена`,
+      confirmText: 'Удалить',
+      type: 'danger'
+    })
+    if (confirmed) {
+      deleteStore(store.id)
+      success('Точка удалена')
+    }
+  }
+
   const tabs = [
     { id: 'general', icon: Store, label: 'Основные' },
+    { id: 'stores', icon: MapPin, label: 'Точки' },
     { id: 'currency', icon: Globe, label: 'Валюта' },
     { id: 'cashiers', icon: Users, label: 'Кассиры' },
     { id: 'receipt', icon: Printer, label: 'Чеки' },
@@ -175,6 +232,123 @@ export default function SettingsScreen() {
                 <label className="block text-sm text-themed-secondary mb-2">Тема оформления</label>
                 <ThemeToggle />
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stores */}
+        {activeTab === 'stores' && (
+          <div className="max-w-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold flex items-center gap-2 text-themed-primary">
+                <MapPin className="text-ios-purple" />
+                Точки продаж
+              </h2>
+              <button
+                onClick={() => openStoreModal()}
+                className="h-10 px-4 bg-ios-blue text-white rounded-ios font-medium flex items-center gap-2 hover:bg-ios-blue/90 transition-colors ios-press"
+              >
+                <Plus size={18} />
+                Добавить
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {stores.map((store) => (
+                <div
+                  key={store.id}
+                  className={`ios-card-grouped p-4 rounded-ios-lg border-2 transition-all ${
+                    currentStore === store.id 
+                      ? 'border-ios-blue bg-ios-blue/5' 
+                      : 'border-transparent'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div 
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        store.isDefault ? 'bg-ios-orange/20' : 'bg-fill-tertiary'
+                      }`}
+                    >
+                      <Store size={24} className={store.isDefault ? 'text-ios-orange' : 'text-themed-tertiary'} />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-themed-primary">{store.name}</span>
+                        {store.isDefault && (
+                          <span className="px-2 py-0.5 bg-ios-orange/20 text-ios-orange text-xs font-medium rounded-full flex items-center gap-1">
+                            <Star size={10} />
+                            По умолчанию
+                          </span>
+                        )}
+                        {currentStore === store.id && (
+                          <span className="px-2 py-0.5 bg-ios-blue/20 text-ios-blue text-xs font-medium rounded-full">
+                            Активная
+                          </span>
+                        )}
+                      </div>
+                      {store.address && (
+                        <p className="text-sm text-themed-secondary flex items-center gap-1">
+                          <MapPin size={12} />
+                          {store.address}
+                        </p>
+                      )}
+                      {store.phone && (
+                        <p className="text-sm text-themed-secondary flex items-center gap-1">
+                          <Phone size={12} />
+                          {store.phone}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                      {currentStore !== store.id && (
+                        <button
+                          onClick={() => setCurrentStore(store.id)}
+                          className="p-2 text-ios-blue hover:bg-ios-blue/10 rounded-ios transition-colors"
+                          title="Выбрать"
+                        >
+                          <Check size={18} />
+                        </button>
+                      )}
+                      {!store.isDefault && (
+                        <button
+                          onClick={() => setDefaultStore(store.id)}
+                          className="p-2 text-ios-orange hover:bg-ios-orange/10 rounded-ios transition-colors"
+                          title="Сделать по умолчанию"
+                        >
+                          <Star size={18} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openStoreModal(store)}
+                        className="p-2 text-themed-secondary hover:bg-fill-tertiary rounded-ios transition-colors"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStore(store)}
+                        className="p-2 text-ios-red hover:bg-ios-red/10 rounded-ios transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {stores.length === 0 && (
+                <div className="text-center py-12 text-themed-tertiary">
+                  <MapPin size={48} className="mx-auto mb-3 opacity-50" />
+                  <p>Нет точек продаж</p>
+                  <button
+                    onClick={() => openStoreModal()}
+                    className="mt-3 text-ios-blue hover:underline"
+                  >
+                    Добавить первую точку
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -463,6 +637,78 @@ export default function SettingsScreen() {
               >
                 <Save size={20} />
                 {editingCashier ? 'Сохранить' : 'Добавить'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Store Modal */}
+      {showStoreModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowStoreModal(false)}
+          />
+          <div className="relative ios-modal w-full max-w-md">
+            <div className="p-5 border-b border-separator flex items-center justify-between">
+              <h3 className="text-ios-title3 font-semibold text-themed-primary">
+                {editingStore ? 'Редактировать точку' : 'Новая точка'}
+              </h3>
+              <button
+                onClick={() => setShowStoreModal(false)}
+                className="w-8 h-8 bg-fill-tertiary rounded-full flex items-center justify-center text-themed-secondary hover:bg-fill-secondary transition-colors ios-press"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleStoreSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm text-themed-secondary mb-2">Название *</label>
+                <input
+                  type="text"
+                  value={storeForm.name}
+                  onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })}
+                  required
+                  placeholder="Главный магазин"
+                  className="w-full h-12 px-4 ios-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-themed-secondary mb-2">Адрес</label>
+                <input
+                  type="text"
+                  value={storeForm.address}
+                  onChange={(e) => setStoreForm({ ...storeForm, address: e.target.value })}
+                  placeholder="ул. Примерная, д. 1"
+                  className="w-full h-12 px-4 ios-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-themed-secondary mb-2">Телефон</label>
+                <input
+                  type="tel"
+                  value={storeForm.phone}
+                  onChange={(e) => setStoreForm({ ...storeForm, phone: e.target.value })}
+                  placeholder="+998 90 123 45 67"
+                  className="w-full h-12 px-4 ios-input"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!storeForm.name.trim()}
+                className={`w-full h-12 rounded-ios-lg font-semibold flex items-center justify-center gap-2 transition-all ios-press mt-6 ${
+                  storeForm.name.trim()
+                    ? 'bg-ios-blue text-white hover:bg-ios-blue/90'
+                    : 'bg-fill-tertiary text-themed-tertiary'
+                }`}
+              >
+                <Save size={20} />
+                {editingStore ? 'Сохранить' : 'Добавить'}
               </button>
             </form>
           </div>

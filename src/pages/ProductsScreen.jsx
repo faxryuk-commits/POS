@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
-import { Plus, Search, Edit2, Trash2, X, Save, Package } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, X, Save, Package, Image as ImageIcon } from 'lucide-react'
 import { HelpButton, InfoTip, FieldError } from '../components/HelpSystem'
 import { useConfirm, useUndoToast, useStatusToast } from '../components/ConfirmDialog'
+import ImageUpload from '../components/ImageUpload'
+import { loadImage } from '../services/imageService'
 
 // Category icons mapping
 const categoryIcons = {
@@ -26,10 +28,27 @@ export default function ProductsScreen() {
     price: '',
     stock: '',
     category: 'Напитки',
-    barcode: ''
+    barcode: '',
+    image: null
   })
+  const [productImages, setProductImages] = useState({})
 
   const { products, categories, addProduct, updateProduct, deleteProduct, getCurrencySymbol } = useStore()
+
+  // Загрузка изображений товаров
+  useEffect(() => {
+    const loadProductImages = async () => {
+      const images = {}
+      for (const product of products) {
+        const img = await loadImage(`product_${product.id}`)
+        if (img) images[product.id] = img
+      }
+      setProductImages(images)
+    }
+    if (products.length > 0) {
+      loadProductImages()
+    }
+  }, [products])
   const currencySymbol = getCurrencySymbol()
   const formatPrice = (price) => `${price.toLocaleString()} ${currencySymbol}`
   const confirm = useConfirm()
@@ -52,7 +71,8 @@ export default function ProductsScreen() {
         price: product.price.toString(),
         stock: product.stock.toString(),
         category: product.category,
-        barcode: product.barcode
+        barcode: product.barcode,
+        image: productImages[product.id] || null
       })
     } else {
       setEditingProduct(null)
@@ -61,7 +81,8 @@ export default function ProductsScreen() {
         price: '',
         stock: '',
         category: 'Напитки',
-        barcode: Date.now().toString()
+        barcode: Date.now().toString(),
+        image: null
       })
     }
     setShowModal(true)
@@ -105,7 +126,7 @@ export default function ProductsScreen() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     if (!validateForm()) return
@@ -120,8 +141,13 @@ export default function ProductsScreen() {
 
     if (editingProduct) {
       updateProduct(editingProduct.id, productData)
+      // Обновляем кэш изображений
+      if (formData.image) {
+        setProductImages(prev => ({ ...prev, [editingProduct.id]: formData.image }))
+      }
       success(`Товар "${productData.name}" обновлён`)
     } else {
+      // Добавляем товар и сохраняем изображение после получения ID
       addProduct(productData)
       success(`Товар "${productData.name}" добавлен`)
     }
@@ -304,21 +330,33 @@ export default function ProductsScreen() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm text-themed-secondary mb-2">Название *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => {
-                    setFormData({ ...formData, name: e.target.value })
-                    if (errors.name) setErrors({ ...errors, name: null })
-                  }}
-                  className={`w-full h-12 px-4 ios-input ${
-                    errors.name ? 'ring-2 ring-ios-red' : ''
-                  }`}
-                  placeholder="Coca-Cola 0.5л"
-                />
-                <FieldError error={errors.name} />
+              {/* Изображение и название */}
+              <div className="flex gap-4">
+                <div className="flex-shrink-0">
+                  <label className="block text-sm text-themed-secondary mb-2">Фото</label>
+                  <ImageUpload
+                    id={editingProduct ? `product_${editingProduct.id}` : null}
+                    currentImage={formData.image}
+                    onImageChange={(img) => setFormData({ ...formData, image: img })}
+                    size="md"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm text-themed-secondary mb-2">Название *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value })
+                      if (errors.name) setErrors({ ...errors, name: null })
+                    }}
+                    className={`w-full h-12 px-4 ios-input ${
+                      errors.name ? 'ring-2 ring-ios-red' : ''
+                    }`}
+                    placeholder="Coca-Cola 0.5л"
+                  />
+                  <FieldError error={errors.name} />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
