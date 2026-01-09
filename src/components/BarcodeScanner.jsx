@@ -59,10 +59,10 @@ export default function BarcodeScanner({ onClose, onScan, onCreateProduct }) {
   ]
 
   const processBarcode = useCallback((code) => {
-    // Предотвращаем повторное сканирование того же кода в течение 3 секунд
+    // Предотвращаем повторное сканирование того же кода в течение 5 секунд
     if (processedCodes.current.has(code)) return
     processedCodes.current.add(code)
-    setTimeout(() => processedCodes.current.delete(code), 3000)
+    setTimeout(() => processedCodes.current.delete(code), 5000)
 
     const product = findProductByBarcode(code)
     
@@ -153,22 +153,46 @@ export default function BarcodeScanner({ onClose, onScan, onCreateProduct }) {
 
         isTransitioning.current = true
         
+        // Конфигурация сканера
+        const scannerConfig = {
+          fps: 5, // Сниженный FPS для меньшего мерцания
+          qrbox: { width: 280, height: 150 },
+          aspectRatio: 16 / 9,
+          disableFlip: false
+        }
+        
+        // Используем deviceId для выбора конкретной камеры
         await html5QrCodeRef.current.start(
-          selectedCamera,
-          {
-            fps: 10,
-            qrbox: { width: 280, height: 150 },
-            aspectRatio: 16 / 9,
-          },
+          { deviceId: { exact: selectedCamera } },
+          scannerConfig,
           (decodedText) => {
             if (isMounted.current) {
               processBarcode(decodedText)
             }
           },
           () => {
-            // Ошибки сканирования игнорируем (это нормально когда нет штрих-кода в кадре)
+            // Ошибки сканирования игнорируем
           }
         )
+        
+        // Применяем настройки фокуса после запуска камеры
+        try {
+          const videoTrack = html5QrCodeRef.current.getRunningTrackCameraCapabilities()
+          if (videoTrack) {
+            // Устанавливаем непрерывный автофокус если поддерживается
+            const constraints = {}
+            
+            if (videoTrack.focusModeFeature?.isSupported()) {
+              const modes = videoTrack.focusModeFeature.value()
+              if (modes.includes('continuous')) {
+                await videoTrack.focusModeFeature.apply('continuous')
+              }
+            }
+          }
+        } catch (focusErr) {
+          // Игнорируем ошибки настройки фокуса
+          console.log('Focus settings not available:', focusErr.message)
+        }
 
         isTransitioning.current = false
         
