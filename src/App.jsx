@@ -17,6 +17,8 @@ import OfflineIndicator from './components/OfflineIndicator'
 import { ThemeProvider, ThemeToggleCompact } from './components/ThemeProvider'
 import { ConfirmProvider, InputDialogProvider, UndoToastProvider, StatusToastProvider } from './components/ConfirmDialog'
 import PWABanner from './components/PWABanner'
+import { useFullscreen } from './hooks/useFullscreen'
+import { Maximize2, Minimize2 } from 'lucide-react'
 
 function App() {
   const { 
@@ -33,6 +35,9 @@ function App() {
   } = useStore()
 
   const currency = getCurrency()
+  
+  // Полноэкранный режим
+  const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen()
   
   // Состояние для обновления времени
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -136,8 +141,18 @@ function App() {
                   {settings?.storeName || 'Касса'}
                 </div>
 
-                {/* Right: Theme Toggle, Time & Date */}
+                {/* Right: Fullscreen, Theme Toggle, Time & Date */}
                 <div className="flex items-center gap-2">
+                  {/* Fullscreen Button */}
+                  {isSupported && (
+                    <button
+                      onClick={toggleFullscreen}
+                      className="w-8 h-8 rounded-ios flex items-center justify-center text-themed-secondary hover:text-ios-blue hover:bg-ios-blue/10 transition-colors"
+                      title={isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                    >
+                      {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                    </button>
+                  )}
                   <ThemeToggleCompact className="hidden sm:flex" />
                   <div className="hidden sm:flex items-center gap-1.5 text-[13px] text-themed-secondary">
                     <span>{currency.flag}</span>

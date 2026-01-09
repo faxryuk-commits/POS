@@ -4,7 +4,7 @@ import { Plus, Search, Edit2, Trash2, X, Save, Package, Image as ImageIcon } fro
 import { HelpButton, InfoTip, FieldError } from '../components/HelpSystem'
 import { useConfirm, useUndoToast, useStatusToast } from '../components/ConfirmDialog'
 import ImageUpload from '../components/ImageUpload'
-import { loadImage } from '../services/imageService'
+import { loadImage, saveImage } from '../services/imageService'
 
 // Category icons mapping
 const categoryIcons = {
@@ -131,24 +131,34 @@ export default function ProductsScreen() {
     
     if (!validateForm()) return
     
+    // Генерируем ID заранее для новых товаров
+    const newProductId = editingProduct?.id || Date.now()
+    
     const productData = {
+      id: newProductId,
       name: formData.name.trim(),
       price: parseFloat(formData.price),
       stock: parseInt(formData.stock),
       category: formData.category,
-      barcode: formData.barcode || Date.now().toString()
+      barcode: formData.barcode || newProductId.toString()
     }
 
     if (editingProduct) {
       updateProduct(editingProduct.id, productData)
-      // Обновляем кэш изображений
+      // Сохраняем изображение
       if (formData.image) {
+        await saveImage(`product_${editingProduct.id}`, formData.image)
         setProductImages(prev => ({ ...prev, [editingProduct.id]: formData.image }))
       }
       success(`Товар "${productData.name}" обновлён`)
     } else {
-      // Добавляем товар и сохраняем изображение после получения ID
+      // Добавляем товар с заранее сгенерированным ID
       addProduct(productData)
+      // Сохраняем изображение для нового товара
+      if (formData.image) {
+        await saveImage(`product_${newProductId}`, formData.image)
+        setProductImages(prev => ({ ...prev, [newProductId]: formData.image }))
+      }
       success(`Товар "${productData.name}" добавлен`)
     }
 

@@ -356,7 +356,7 @@ export const useStore = create(
 
       // Методы для товаров
       addProduct: (product) => set((state) => ({
-        products: [...state.products, { ...product, id: Date.now() }]
+        products: [...state.products, { ...product, id: product.id || Date.now() }]
       })),
       
       updateProduct: (id, updates) => set((state) => ({

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Camera, Upload, X, Image as ImageIcon, Loader2, Info } from 'lucide-react'
 import { compressImage, saveImage, loadImage, deleteImage } from '../services/imageService'
 
 /**
@@ -13,7 +13,8 @@ export default function ImageUpload({
   size = 'md', // sm, md, lg
   shape = 'square', // square, circle
   placeholder = null,
-  disabled = false
+  disabled = false,
+  showHint = true // Показывать подсказку по размеру
 }) {
   const [image, setImage] = useState(currentImage)
   const [loading, setLoading] = useState(false)
@@ -27,9 +28,16 @@ export default function ImageUpload({
     lg: 'w-32 h-32',
   }
 
+  // Синхронизация с внешним currentImage
+  useEffect(() => {
+    if (currentImage !== image) {
+      setImage(currentImage)
+    }
+  }, [currentImage])
+
   // Загрузка сохранённого изображения
   useEffect(() => {
-    if (id && !currentImage) {
+    if (id && !currentImage && !image) {
       loadImage(id).then((savedImage) => {
         if (savedImage) {
           setImage(savedImage)
@@ -185,24 +193,38 @@ export default function ImageUpload({
 
       {/* Кнопки для мобильных */}
       {!image && !loading && !disabled && size !== 'sm' && (
-        <div className="flex gap-1 mt-2 justify-center">
-          <button
-            type="button"
-            onClick={openCamera}
-            className="p-1.5 text-gray-500 hover:text-ios-blue hover:bg-ios-blue/10 rounded-lg transition-colors"
-            title="Камера"
-          >
-            <Camera size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={openGallery}
-            className="p-1.5 text-gray-500 hover:text-ios-blue hover:bg-ios-blue/10 rounded-lg transition-colors"
-            title="Галерея"
-          >
-            <Upload size={16} />
-          </button>
+        <div className="flex flex-col items-center gap-1 mt-2">
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={openCamera}
+              className="p-1.5 text-gray-500 hover:text-ios-blue hover:bg-ios-blue/10 rounded-lg transition-colors"
+              title="Камера"
+            >
+              <Camera size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={openGallery}
+              className="p-1.5 text-gray-500 hover:text-ios-blue hover:bg-ios-blue/10 rounded-lg transition-colors"
+              title="Галерея"
+            >
+              <Upload size={16} />
+            </button>
+          </div>
+          {showHint && (
+            <p className="text-[9px] text-gray-400 text-center leading-tight">
+              400×400px, до 10MB
+            </p>
+          )}
         </div>
+      )}
+      
+      {/* Подсказка под изображением */}
+      {image && showHint && size !== 'sm' && (
+        <p className="text-[9px] text-gray-400 text-center mt-1">
+          Нажмите для замены
+        </p>
       )}
     </div>
   )
